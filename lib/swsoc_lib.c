@@ -8,17 +8,20 @@
 #include <sys/ioctl.h>
 #include "swsoc_lib.h"
 
-/* now obsoleted
-int sw_open(void)
+char DevName[8][16]={"/dev/swsoc0","/dev/swsoc1","/dev/swsoc2","/dev/swsoc3",
+		     "/dev/swsoc4","/dev/swsoc5","/dev/swsoc6","/dev/swsoc73"};
+
+int sw_open(int port)
 {
   int sw_fd;
   
-  if((sw_fd = open(DEVFILE, O_RDWR)) < 0){
+  if (port<0 || port>8) return(-1);
+
+  if((sw_fd = open(DevName[port], O_RDWR)) < 0){
     printf("error: can not open device file.\n");    
   };
   return(sw_fd);
 }
-*/
 
 void sw_close(int sw_fd)
 {

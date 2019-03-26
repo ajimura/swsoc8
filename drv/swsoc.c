@@ -154,7 +154,7 @@ static long swsoc_ioctl(
   
   int retval = 0;
 
-  if (!access_ok(VERIFY_READ, (void __user *)arg,_IOC_SIZE(cmd))){ // need check _IOC_SIZE(cmd)...
+  if (!access_ok(VERIFY_READ, (void __user *)arg,_IOC_SIZE(cmd))){
     retval=-EFAULT; goto done; }
   if (copy_from_user(&cmd_mem, (int __user *)arg,sizeof(cmd_mem))){
     retval = -EFAULT; goto done; }
@@ -162,7 +162,7 @@ static long swsoc_ioctl(
   switch(cmd){
 
   case SW_REG_READ:
-    address=cmd_mem.addr & 0x000000ff;
+    address=cmd_mem.addr & 0x0000003f;
     cmd_mem.val=ioread32(csrtop+address);
     rmb();
     if (copy_to_user((int __user *)arg, &cmd_mem, sizeof(cmd_mem))){
@@ -173,7 +173,7 @@ static long swsoc_ioctl(
     break;
 
   case SW_REG_WRITE:
-    address=cmd_mem.addr & 0x000000ff;
+    address=cmd_mem.addr & 0x0000003f;
     iowrite32(cmd_mem.val,csrtop+address);
     wmb();
 #if VERB
@@ -209,10 +209,6 @@ static long swsoc_ioctl(
       printk(KERN_DEBUG "IOWB_cmd.size %x (%s)\n",real_len, __func__);
 #endif
     }
-    break;
-
-  case SW_TIME_MARK:
-    printk(KERN_DEBUG "TimeMark(%4d): %lu/%d\n",cmd_mem.val,jiffies,HZ);
     break;
 
   case SW_PCKT_READ:
@@ -261,19 +257,15 @@ static long swsoc_ioctl(
   case RMAP_REQ:
     data=ioread32(csrtop+ADD_TX_CSR); //RX CSR
     if ((data&0x80000000)!=0) {retval=-1; goto done;}
-
     put_size=rmap_create_buffer(cmd_mem.cmd,cmd_mem.saddr,cmd_mem.daddr,
 				cmd_mem.key,cmd_mem.tid,cmd_mem.addr,cmd_mem.val);
     real_len=(put_size+3)/4*4;
-
     memcpy_toio(datatop,tx_buffer,real_len);
     wmb();
     iowrite32(0x80400000+put_size,csrtop+ADD_TX_CSR);
-
     cmd_mem.val=put_size;
     if (copy_to_user((int __user *)arg, &cmd_mem, sizeof(cmd_mem))){
       retval = -EFAULT; goto done; }
-
 #if VERB
     printk(KERN_DEBUG "IOREQ_cmd.size %x (%s)\n",real_len, __func__);
 #endif
@@ -284,21 +276,16 @@ static long swsoc_ioctl(
     if ((data&0x80000000)==0) {retval=-1; goto done;}
     if ((data&0x00400000)==0) {retval=-1; goto done;}
     max_size=cmd_mem.val;
-
     memcpy_fromio(buftop,datatop,12);
-
     cmd_mem.key=buftop[3];
     ret_tid=buftop[5]*0x100+buftop[6];
     cmd_mem.val=buftop[8]*0x10000+buftop[9]*0x100+buftop[10];
     if (copy_to_user((int __user *)arg, &cmd_mem, sizeof(cmd_mem))){
       retval = -EFAULT; goto done; }
-
     if (cmd_mem.tid!=0 && cmd_mem.tid!=ret_tid) {retval=-EFAULT;goto done;}
     if (cmd_mem.key!=0) {retval=-EFAULT;goto done;}
-
     get_size=(cmd_mem.val+3)/4*4;
     if (get_size>max_size) get_size=max_size;
-
     if (!access_ok(VERIFY_WRITE, (void __user *)cmd_mem.ptr,get_size)){
       retval = -EFAULT; goto done; }
     if (copy_to_user((int __user *)cmd_mem.ptr, datatop+12, get_size)){
@@ -309,6 +296,10 @@ static long swsoc_ioctl(
 #if VERB
     printk(KERN_DEBUG "IORCV_cmd.size %x (%s)\n",get_size, __func__);
 #endif
+    break;
+
+  case SW_TIME_MARK:
+    printk(KERN_DEBUG "TimeMark(%4d): %lu/%d\n",cmd_mem.val,jiffies,HZ);
     break;
 
   default:

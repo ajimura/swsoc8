@@ -36,13 +36,11 @@ struct swio_mem {
 #define SW_REG_WRITE _IOW(IOC_MAGIC, 2, struct swio_mem)
 #define SW_MEM_READ  _IOR(IOC_MAGIC, 3, struct swio_mem)
 #define SW_MEM_WRITE _IOW(IOC_MAGIC, 4, struct swio_mem)
-#define SW_TIME_MARK _IOW(IOC_MAGIC, 5, struct swio_mem)
-//#define RMAP_MEM_READ  _IOR(IOC_MAGIC, 6, struct swio_mem)
-//#define RMAP_MEM_WRITE _IOW(IOC_MAGIC, 7, struct swio_mem)
-#define SW_PCKT_READ  _IOR(IOC_MAGIC, 6, struct swio_mem)
-#define SW_PCKT_WRITE _IOW(IOC_MAGIC, 7, struct swio_mem)
-#define RMAP_REQ _IOW(IOC_MAGIC, 8, struct swio_mem)
-#define RMAP_RCV _IOR(IOC_MAGIC, 9, struct swio_mem)
+#define SW_PCKT_READ  _IOR(IOC_MAGIC, 5, struct swio_mem)
+#define SW_PCKT_WRITE _IOW(IOC_MAGIC, 6, struct swio_mem)
+#define RMAP_REQ _IOW(IOC_MAGIC, 7, struct swio_mem)
+#define RMAP_RCV _IOR(IOC_MAGIC, 8, struct swio_mem)
+#define SW_TIME_MARK _IOW(IOC_MAGIC, 9, struct swio_mem)
 
 #define ADD_CM_REG	0x00000000
 #define ADD_ST_REG	0x00000004
