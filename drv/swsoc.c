@@ -268,11 +268,13 @@ static long swsoc_ioctl(
     put_size=rmap_create_buffer(cmd_mem.cmd,cmd_mem.saddr,cmd_mem.daddr,
 				cmd_mem.key,cmd_mem.tid,cmd_mem.addr,req_size,cmd_mem.val);
     real_len=(put_size+3)/4*4;
+#if VERB
     printk(KERN_DEBUG "(%d)%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
 	   swsoc->minor,
 	   tx_buffer[0],tx_buffer[1],tx_buffer[2],tx_buffer[3],tx_buffer[4],tx_buffer[5],
 	   tx_buffer[6],tx_buffer[7],tx_buffer[8],tx_buffer[9],tx_buffer[10],tx_buffer[11],
 	   tx_buffer[12],tx_buffer[13],tx_buffer[14],tx_buffer[15]);
+#endif
     memcpy_toio(datatop,tx_buffer,real_len);
     wmb();
     iowrite32(0x80400000+put_size,csrtop+ADD_TX_CSR);
@@ -290,10 +292,12 @@ static long swsoc_ioctl(
     if ((data&0x00400000)==0) {retval=-1; goto done;}
     max_size=cmd_mem.val;
     memcpy_fromio(buftop,datatop,12);
-      printk(KERN_DEBUG "(%d)%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
-	     swsoc->minor,
-	     buftop[0],buftop[1],buftop[2],buftop[3],buftop[4],buftop[5],
-	     buftop[6],buftop[7],buftop[8],buftop[9],buftop[10],buftop[11]);
+#if VERB
+    printk(KERN_DEBUG "(%d)%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+	   swsoc->minor,
+	   buftop[0],buftop[1],buftop[2],buftop[3],buftop[4],buftop[5],
+	   buftop[6],buftop[7],buftop[8],buftop[9],buftop[10],buftop[11]);
+#endif
     cmd_mem.key=buftop[3];
     ret_tid=buftop[5]*0x100+buftop[6];
     cmd_mem.val=buftop[8]*0x10000+buftop[9]*0x100+buftop[10];
@@ -310,7 +314,6 @@ static long swsoc_ioctl(
       retval = -EFAULT; goto done; }
     rmb();
     iowrite32(0,csrtop+ADD_RX_CSR);
-
 #if VERB
     printk(KERN_DEBUG "(%d)IORCV_cmd.size %x (%s)\n",swsoc->minor,get_size, __func__);
 #endif
