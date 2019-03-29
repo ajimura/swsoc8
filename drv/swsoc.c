@@ -17,7 +17,7 @@
 #include <asm/io.h>
 #include "swsoc.h"
 
-#define VERB 0
+#define VERB 1
 #define DevsNum 8
 
 struct swsoc_devinfo {
@@ -30,6 +30,8 @@ struct swsoc_dev {
   struct swsoc_devinfo *devinfo;
   void * __iomem csr_ptr;
   void * __iomem data_ptr;
+  int major;
+  int minor;
 };
 
 unsigned long jiffies_open;
@@ -37,7 +39,7 @@ int refcount[DevsNum];
 static spinlock_t swsoc_spin_lock;
 
 unsigned char rmap_calc_crc(void *,unsigned int );
-int rmap_create_buffer(unsigned char, unsigned char, unsigned char, unsigned char, unsigned int, unsigned int, unsigned int);
+int rmap_create_buffer(unsigned char, unsigned char, unsigned char, unsigned char, unsigned int, unsigned int, unsigned int, unsigned int);
 unsigned char tx_buffer[1024];
 unsigned char RM_CRCTbl [] = {
   0x00,0x91,0xe3,0x72,0x07,0x96,0xe4,0x75,  0x0e,0x9f,0xed,0x7c,0x09,0x98,0xea,0x7b,
@@ -100,6 +102,9 @@ static int swsoc_open(struct inode *inode, struct file *file)
   //  printk(KERN_DEBUG "SpW RX %08x %08x\n",*(csr+4), *(csr+5));
   //  printk(KERN_DEBUG "SpW TX %08x %08x\n",*(csr+8), *(csr+9));
 
+  swsoc->major=major;
+  swsoc->minor=minor;
+
   spin_unlock(&swsoc_spin_lock);
 
   return 0;
@@ -144,6 +149,7 @@ static long swsoc_ioctl(
   unsigned int address;
   int real_len;
   unsigned int data;
+  unsigned int req_size;
   int get_size;
   int put_size;
   int max_size;
@@ -151,6 +157,7 @@ static long swsoc_ioctl(
   unsigned int *buftop32;
   unsigned int ret_tid;
   unsigned char ret_status;
+  int i;
   
   int retval = 0;
 
@@ -168,7 +175,7 @@ static long swsoc_ioctl(
     if (copy_to_user((int __user *)arg, &cmd_mem, sizeof(cmd_mem))){
       retval = -EFAULT; goto done; }
 #if VERB
-    printk(KERN_DEBUG "IOR_cmd.val/addr %08x %08x(%s)\n",cmd_mem.val,address, __func__);
+    printk(KERN_DEBUG "(%d)IOR_cmd.val/addr %08x %08x(%s)\n",swsoc->minor,cmd_mem.val,address, __func__);
 #endif
     break;
 
@@ -177,7 +184,7 @@ static long swsoc_ioctl(
     iowrite32(cmd_mem.val,csrtop+address);
     wmb();
 #if VERB
-    printk(KERN_DEBUG "IOW_cmd.val/addr %08x %08x(%s)\n",cmd_mem.val,address, __func__);
+    printk(KERN_DEBUG "(%d)IOW_cmd.val/addr %08x %08x(%s)\n",swsoc->minor,cmd_mem.val,address, __func__);
 #endif
     break;
 
@@ -191,7 +198,7 @@ static long swsoc_ioctl(
 	retval = -EFAULT; goto done; }
       rmb();
 #if VERB
-      printk(KERN_DEBUG "IORB_cmd.size %x (%s)\n",real_len, __func__);
+      printk(KERN_DEBUG "(%d)IORB_cmd.size %x (%s)\n",swsoc->minor,real_len, __func__);
 #endif
     }
     break;
@@ -206,7 +213,7 @@ static long swsoc_ioctl(
 	retval = -EFAULT; goto done; }
       wmb();
 #if VERB
-      printk(KERN_DEBUG "IOWB_cmd.size %x (%s)\n",real_len, __func__);
+      printk(KERN_DEBUG "(%d)IOWB_cmd.size %x (%s)\n",swsoc->minor,real_len, __func__);
 #endif
     }
     break;
@@ -229,7 +236,7 @@ static long swsoc_ioctl(
       retval = -EFAULT; goto done; }
     rmb();
 #if VERB
-    printk(KERN_DEBUG "IORMR_cmd.size %x (%s)\n",get_size, __func__);
+    printk(KERN_DEBUG "(%d)IORMR_cmd.size %x (%s)\n",swsoc->minor,get_size, __func__);
 #endif
     break;
     
@@ -250,16 +257,22 @@ static long swsoc_ioctl(
     if (copy_to_user((int __user *)arg, &cmd_mem, sizeof(cmd_mem))){
       retval = -EFAULT; goto done; }
 #if VERB
-    printk(KERN_DEBUG "IORMW_cmd.size %x (%s)\n",real_len, __func__);
+    printk(KERN_DEBUG "(%d)IORMW_cmd.size %x (%s)\n",swsoc->minor,real_len, __func__);
 #endif
     break;
 
   case RMAP_REQ:
     data=ioread32(csrtop+ADD_TX_CSR); //RX CSR
     if ((data&0x80000000)!=0) {retval=-1; goto done;}
+    if (cmd_mem.val>(data&0x0000ffff)) req_size=data&0x0000ffff; else req_size=cmd_mem.val;
     put_size=rmap_create_buffer(cmd_mem.cmd,cmd_mem.saddr,cmd_mem.daddr,
-				cmd_mem.key,cmd_mem.tid,cmd_mem.addr,cmd_mem.val);
+				cmd_mem.key,cmd_mem.tid,cmd_mem.addr,req_size,cmd_mem.val);
     real_len=(put_size+3)/4*4;
+    printk(KERN_DEBUG "(%d)%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+	   swsoc->minor,
+	   tx_buffer[0],tx_buffer[1],tx_buffer[2],tx_buffer[3],tx_buffer[4],tx_buffer[5],
+	   tx_buffer[6],tx_buffer[7],tx_buffer[8],tx_buffer[9],tx_buffer[10],tx_buffer[11],
+	   tx_buffer[12],tx_buffer[13],tx_buffer[14],tx_buffer[15]);
     memcpy_toio(datatop,tx_buffer,real_len);
     wmb();
     iowrite32(0x80400000+put_size,csrtop+ADD_TX_CSR);
@@ -267,7 +280,7 @@ static long swsoc_ioctl(
     if (copy_to_user((int __user *)arg, &cmd_mem, sizeof(cmd_mem))){
       retval = -EFAULT; goto done; }
 #if VERB
-    printk(KERN_DEBUG "IOREQ_cmd.size %x (%s)\n",real_len, __func__);
+    printk(KERN_DEBUG "(%d)IOREQ_cmd.size %x (%s)\n",swsoc->minor,real_len, __func__);
 #endif
     break;
 
@@ -277,13 +290,18 @@ static long swsoc_ioctl(
     if ((data&0x00400000)==0) {retval=-1; goto done;}
     max_size=cmd_mem.val;
     memcpy_fromio(buftop,datatop,12);
+      printk(KERN_DEBUG "(%d)%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+	     swsoc->minor,
+	     buftop[0],buftop[1],buftop[2],buftop[3],buftop[4],buftop[5],
+	     buftop[6],buftop[7],buftop[8],buftop[9],buftop[10],buftop[11]);
     cmd_mem.key=buftop[3];
     ret_tid=buftop[5]*0x100+buftop[6];
     cmd_mem.val=buftop[8]*0x10000+buftop[9]*0x100+buftop[10];
     if (copy_to_user((int __user *)arg, &cmd_mem, sizeof(cmd_mem))){
       retval = -EFAULT; goto done; }
     if (cmd_mem.tid!=0 && cmd_mem.tid!=ret_tid) {retval=-EFAULT;goto done;}
-    if (cmd_mem.key!=0) {retval=-EFAULT;goto done;}
+    if (cmd_mem.key!=0) {
+      retval=-EFAULT;goto done;}
     get_size=(cmd_mem.val+3)/4*4;
     if (get_size>max_size) get_size=max_size;
     if (!access_ok(VERIFY_WRITE, (void __user *)cmd_mem.ptr,get_size)){
@@ -294,12 +312,12 @@ static long swsoc_ioctl(
     iowrite32(0,csrtop+ADD_RX_CSR);
 
 #if VERB
-    printk(KERN_DEBUG "IORCV_cmd.size %x (%s)\n",get_size, __func__);
+    printk(KERN_DEBUG "(%d)IORCV_cmd.size %x (%s)\n",swsoc->minor,get_size, __func__);
 #endif
     break;
 
   case SW_TIME_MARK:
-    printk(KERN_DEBUG "TimeMark(%4d): %lu/%d\n",cmd_mem.val,jiffies,HZ);
+    printk(KERN_DEBUG "(%d)TimeMark(%4d): %lu/%d\n",swsoc->minor,cmd_mem.val,jiffies,HZ);
     break;
 
   default:
@@ -399,7 +417,7 @@ unsigned char rmap_calc_crc(void *buf,unsigned int len){
 }
 
 int rmap_create_buffer(unsigned char command, unsigned char saddr, unsigned char daddr, unsigned char key,
-		       unsigned int tid, unsigned int addr, unsigned int size){// for "put" size is put_data
+		       unsigned int tid, unsigned int addr, unsigned int size, unsigned int data){// for "put" size is put_data
   int i;
   int in_length;
   unsigned int header_size;
@@ -426,10 +444,10 @@ int rmap_create_buffer(unsigned char command, unsigned char saddr, unsigned char
     *ptr++=0x04;		//Data Size
     *ptr++ = rmap_calc_crc(crc_start,header_size);	//Header CRC
     dptr=ptr;
-    *ptr++ = (size    )&0xff;		//Data
-    *ptr++ = (size>> 8)&0xff;		//Data
-    *ptr++ = (size>>16)&0xff;		//Data
-    *ptr++ = (size>>24)&0xff;		//Data
+    *ptr++ = (data    )&0xff;		//Data
+    *ptr++ = (data>> 8)&0xff;		//Data
+    *ptr++ = (data>>16)&0xff;		//Data
+    *ptr++ = (data>>24)&0xff;		//Data
     *ptr++ = rmap_calc_crc(dptr,4);	//Data CRC
     return header_size + 6;
   }else{
