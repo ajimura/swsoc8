@@ -154,10 +154,7 @@ static long swsoc_ioctl(
   int put_size;
   int max_size;
   unsigned char buftop[12];
-  unsigned int *buftop32;
   unsigned int ret_tid;
-  unsigned char ret_status;
-  int i;
   
   int retval = 0;
 
@@ -421,8 +418,6 @@ unsigned char rmap_calc_crc(void *buf,unsigned int len){
 
 int rmap_create_buffer(unsigned char command, unsigned char saddr, unsigned char daddr, unsigned char key,
 		       unsigned int tid, unsigned int addr, unsigned int size, unsigned int data){// for "put" size is put_data
-  int i;
-  int in_length;
   unsigned int header_size;
   unsigned char *ptr, *dptr, *crc_start;
   

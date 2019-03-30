@@ -57,7 +57,6 @@ int sw_r(int sw_fd, int port, unsigned int address, unsigned int *value)
 int sw_bw(int sw_fd, int port, unsigned int *ptr, unsigned int size)
 {
   struct swio_mem swio;
-  int i;
 
   if(sw_fd < 0) return(-1);
   if (port<0||port>7) return(-1);
@@ -70,7 +69,6 @@ int sw_bw(int sw_fd, int port, unsigned int *ptr, unsigned int size)
 int sw_br(int sw_fd, int port, unsigned int *ptr, unsigned int size)
 {
   struct swio_mem swio;
-  int i;
 
   if(sw_fd < 0) return(-1);
   if (port<0||port>7) return(-1);
@@ -196,11 +194,11 @@ int sw_rcv(int sw_fd, int port, unsigned int *data, int *status, int tid, int si
 }  
 
 int sw_link_test(int sw_fd, int port) {
-  int i;
-  sw_r(sw_fd,port, ADD_RX_CSR,&i);
-  if ((i&0x40000000)==0){
-    sw_r(sw_fd,port,ADD_RX_CSR,&i);
-    if ((i&0x40000000)==0){
+  unsigned int data;
+  sw_r(sw_fd,port, ADD_RX_CSR,&data);
+  if ((data&0x40000000)==0){
+    sw_r(sw_fd,port,ADD_RX_CSR,&data);
+    if ((data&0x40000000)==0){
       return -1;
     }
   }
