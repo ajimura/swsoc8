@@ -186,10 +186,10 @@ int sw_rcv(int sw_fd, int port, unsigned int *data, int *status, int tid, int si
   swio.ptr=data;
   swio.tid=tid;
   if ((ret=ioctl(sw_fd,RMAP_RCV,&swio))<0){
-    *status=swio.key;
     printf("Error in block read %d %X\n",ret,swio.key);
     return -1;
   }
+  *status=swio.key;
   return swio.val;
 }  
 
