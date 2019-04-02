@@ -17,7 +17,7 @@
 #include <asm/io.h>
 #include "swsoc.h"
 
-#define VERB 1
+#define VERB 0
 #define DevsNum 8
 
 struct swsoc_devinfo {
@@ -240,7 +240,7 @@ static long swsoc_ioctl(
   case SW_PCKT_WRITE:
     data=ioread32(csrtop+ADD_TX_CSR); //RX CSR
     if ((data&0x80000000)!=0) {retval=-1; goto done;}
-    max_size=data&0x000fffff;
+    max_size=data&0x000ffffc;
     if (cmd_mem.val>max_size) put_size=max_size; else put_size=cmd_mem.val;
     real_len=(put_size+3)/4*4;
     if (!access_ok(VERIFY_READ, (void __user *)cmd_mem.ptr,real_len)){
@@ -248,7 +248,8 @@ static long swsoc_ioctl(
     if (copy_from_user(datatop, (void __user *)cmd_mem.ptr,real_len)){
       retval = -EFAULT; goto done; }
     wmb();
-    iowrite32(0x80400000+cmd_mem.val,csrtop+ADD_TX_CSR);
+    //    iowrite32(0x80400000+cmd_mem.val,csrtop+ADD_TX_CSR);
+    iowrite32(0x80400000+put_size,csrtop+ADD_TX_CSR);
     //put_size to user
     cmd_mem.val=put_size;
     if (copy_to_user((int __user *)arg, &cmd_mem, sizeof(cmd_mem))){
@@ -261,7 +262,7 @@ static long swsoc_ioctl(
   case RMAP_REQ:
     data=ioread32(csrtop+ADD_TX_CSR); //RX CSR
     if ((data&0x80000000)!=0) {retval=-1; goto done;}
-    if (cmd_mem.val>(data&0x0000ffff)) req_size=data&0x0000ffff; else req_size=cmd_mem.val;
+    if (cmd_mem.val>(data&0x0000fffc)) req_size=data&0x0000fffc; else req_size=cmd_mem.val;
     put_size=rmap_create_buffer(cmd_mem.cmd,cmd_mem.saddr,cmd_mem.daddr,
 				cmd_mem.key,cmd_mem.tid,cmd_mem.addr,req_size,cmd_mem.val);
     real_len=(put_size+3)/4*4;
