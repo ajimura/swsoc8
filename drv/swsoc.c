@@ -226,12 +226,12 @@ static long swsoc_ioctl(
       retval = -EFAULT; goto done; }
     if (copy_to_user((int __user *)cmd_mem.ptr, datatop, get_size)){
       retval = -EFAULT; goto done; }
+    rmb();
     iowrite32(0,csrtop+ADD_RX_CSR);
     //real_len to user
     cmd_mem.val=real_len;
     if (copy_to_user((int __user *)arg, &cmd_mem, sizeof(cmd_mem))){
       retval = -EFAULT; goto done; }
-    rmb();
 #if VERB
     printk(KERN_DEBUG "(%d)IORMR_cmd.size %x (%s)\n",swsoc->minor,get_size, __func__);
 #endif

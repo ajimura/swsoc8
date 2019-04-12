@@ -6,3 +6,7 @@ drv/.tmp_versions/
 Module.symvers
 modules.order
 *.ko
+flush
+getver
+reset
+status

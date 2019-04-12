@@ -1,5 +1,5 @@
 /* by Shuhei Ajimura */
-
+/* origianl: for SpaceCube by M. Nomachi */
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -31,14 +31,13 @@ void sw_close(int sw_fd)
 int sw_w(int sw_fd, int port, unsigned int address, unsigned int value)
 {
   struct swio_mem swio;
-  int ret;
 
   if(sw_fd < 0) return(-1);
+  if (port<0||port>7) return(-1);
   swio.addr = address;
   swio.port = port;
   swio.val = value;
-  ret=ioctl(sw_fd,SW_REG_WRITE,&swio);
-  return (ret);
+  return(ioctl(sw_fd,SW_REG_WRITE,&swio));
 }
 
 int sw_r(int sw_fd, int port, unsigned int address, unsigned int *value)
@@ -47,6 +46,7 @@ int sw_r(int sw_fd, int port, unsigned int address, unsigned int *value)
   int ret;
 
   if(sw_fd < 0) return(-1);
+  if (port<0||port>7) return(-1);
   swio.addr = address;
   swio.port = port;
   ret=ioctl(sw_fd,SW_REG_READ,&swio);
@@ -88,7 +88,7 @@ int sw_put_data0(int sw_fd, int port, unsigned int *data, unsigned int size)
   sw_r(sw_fd,port,ADD_TX_CSR,&st);
   if ((st&0x80000000)!=0) return -1;
 
-  max_size = st&0x000FFFFF; /*16bit*/
+  max_size = st&0x000FFFFC; /*16bit*/
   if (i_size > max_size) i_size=max_size;
   if (i_size%4==0) put_size=i_size;
   else             put_size=(i_size/4+1)*4;
@@ -139,7 +139,7 @@ int sw_get_data0(int sw_fd, int port, unsigned int *data, unsigned int size)
   }
   i = sw_w(sw_fd,port,ADD_RX_CSR,0);
   if (i){
-    printf("Error in flush buffer %X\n",i);
+    printf("Error in flush buffer\n");
     return -1;
   }
   return j_size;
@@ -193,9 +193,9 @@ int sw_rcv(int sw_fd, int port, unsigned int *data, int *status, int tid, int si
   return swio.val;
 }  
 
-int sw_link_test(int sw_fd, int port) {
+int sw_link_test(int sw_fd, int port){
   unsigned int data;
-  sw_r(sw_fd,port, ADD_RX_CSR,&data);
+  sw_r(sw_fd,port,ADD_RX_CSR,&data);
   if ((data&0x40000000)==0){
     sw_r(sw_fd,port,ADD_RX_CSR,&data);
     if ((data&0x40000000)==0){
@@ -210,42 +210,42 @@ int sw_link_check(int sw_fd, int port){
   sw_r(sw_fd,port,ADD_ST_REG,&st);
   sw_r(sw_fd,port,ADD_TX_CSR,&tx);
   sw_r(sw_fd,port,ADD_RX_CSR,&rx);
-  if ((st&0x80000000)==0 || (tx&0x40000000)==0 ||(rx&0x40000000)==0)  //check link stats
+  if ((st&0x80000000)==0||(tx&0x40000000)==0||(rx&0x40000000)==0) //check link
     return -1;
-  if ((tx&0x80000000)>0 || (rx&0x80000000)>0)  //check buffer
+  if ((tx&0x80000000)>0||(rx&0x80000000)>0) //check buffer
     return -1;
   return 0;
 }
 
-void sw_link_reset(int sw_fd, int port) {
+void sw_link_reset(int sw_fd, int port){
   sw_w(sw_fd,port,ADD_CM_REG,1);
   usleep(10000);
   sw_w(sw_fd,port,ADD_CM_REG,0);
   usleep(10000);
 }
 
-void sw_link_up(int sw_fd, int port) {
+void sw_link_up(int sw_fd, int port){
   sw_w(sw_fd,port,ADD_CM_REG,0);
   usleep(10000);
 }
 
-void sw_link_down(int sw_fd, int port) {
+void sw_link_down(int sw_fd, int port){
   sw_w(sw_fd,port,ADD_CM_REG,1);
   usleep(10000);
 }
 
-int sw_rx_status(int sw_fd, int port) {
+int sw_rx_status(int sw_fd, int port){
   unsigned int data;
   sw_r(sw_fd,port,ADD_RX_CSR,&data);
   if (data&0x80000000) return data&0xfffff;
   else return -1;
 }
 
-int sw_rx_flush(int sw_fd, int port) {
+int sw_rx_flush(int sw_fd, int port){
   unsigned int st;
   int i;
-  for(i=0;i<10;i++) {
-    sw_r(sw_fd, port, ADD_RX_CSR,&st);
+  for(i=0;i<10;i++){
+    sw_r(sw_fd,port,ADD_RX_CSR,&st);
     if ((st&0x80000000)==0) return 0;
     sw_w(sw_fd,port,ADD_RX_CSR,0);
     usleep(1);
