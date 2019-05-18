@@ -9,7 +9,7 @@
 #include "swsoc_lib.h"
 
 char DevName[8][16]={"/dev/swsoc0","/dev/swsoc1","/dev/swsoc2","/dev/swsoc3",
-		     "/dev/swsoc4","/dev/swsoc5","/dev/swsoc6","/dev/swsoc73"};
+		     "/dev/swsoc4","/dev/swsoc5","/dev/swsoc6","/dev/swsoc7"};
 
 int sw_open(int port)
 {
