@@ -86,20 +86,23 @@ int sw_put_data0(int sw_fd, int port, unsigned int *data, unsigned int size)
   i_size=size;
 
   sw_r(sw_fd,port,ADD_TX_CSR,&st);
-  if ((st&0x80000000)!=0) return -1;
+  if ((st&0x80000000)!=0){
+    printf("sw_put_data0: no TX buffer port=%d\n",port);
+    return -1;
+  }
 
   max_size = st&0x000FFFFC; /*16bit*/
   if (i_size > max_size) i_size=max_size;
   if (i_size%4==0) put_size=i_size;
   else             put_size=(i_size/4+1)*4;
   i = sw_bw(sw_fd, port, data, put_size);
-  if (i){
-    printf("Error in block write %X %X\n",i,put_size);
+  if (i<0){
+    printf("sw_put_data0: Error in block write error=%d port=%d\n",i,port);
     return -1;
   }
   i = sw_w(sw_fd, port, ADD_TX_CSR,0x80400000+i_size);
-  if (i){
-    printf("Error in issue GO %X\n",i);
+  if (i<0){
+    printf("sw_put_data0: Error in issue GO error=%d port=%d\n",i,port);
     return -1;
   }
   return put_size; 
@@ -113,7 +116,7 @@ int sw_put_data(int sw_fd, int port, unsigned int *data, unsigned int size)
   swio.val=size;
   swio.ptr=data;
   if ((ret=ioctl(sw_fd,SW_PCKT_WRITE,&swio))<0){
-    printf("Error in block write %X %X\n",ret,swio.val);
+    printf("sw_put_data: Error in packet write error=%d port=%d put_size=%d\n",ret,port,swio.val);
     return -1;
   }
   return swio.val;
@@ -125,21 +128,27 @@ int sw_get_data0(int sw_fd, int port, unsigned int *data, unsigned int size)
   unsigned int st, j_size, get_size;
   
   sw_r(sw_fd, port, ADD_RX_CSR,&st);
-  if ((st&0x80000000)==0) return -1;
-  if ((st&0x00400000)==0) return -2;
+  if ((st&0x80000000)==0){
+    printf("sw_get_data0: no data port=%d\n",port);
+    return -1;
+  }
+  if ((st&0x00400000)==0){
+    printf("sw_get_data0: no EOP port=%d\n",port);
+    return -2;
+  }
 
   j_size = st & 0x0FFFFF;
   if (j_size > size) j_size = size;
   if (j_size%4==0) get_size=j_size;
   else             get_size=(j_size/4+1)*4;
   i = sw_br(sw_fd,port,data,get_size);
-  if (i){
-    printf("Error in block read (sw_get_data0) %X %X\n",i,get_size);
+  if (i<0){
+    printf("sw_get_data0: Error in block read error=%d port=%d\n",i,port);
     return -1;
   }
   i = sw_w(sw_fd,port,ADD_RX_CSR,0);
-  if (i){
-    printf("Error in flush buffer\n");
+  if (i<0){
+    printf("sw_get_data0: Error in flush buffer error=%d port=%d\n",i,port);
     return -1;
   }
   return j_size;
@@ -153,7 +162,7 @@ int sw_get_data(int sw_fd, int port, unsigned int *data, unsigned int size)
   swio.val=size;
   swio.ptr=data;
   if ((ret=ioctl(sw_fd,SW_PCKT_READ,&swio))<0){
-    printf("Error in block read (sw_get_data) %X %X\n",ret,swio.val);
+    printf("sw_get_data: Error in packet read error=%d port=%d get_size=%d\n",ret,port,swio.val);
     return -1;
   }
   return swio.val;
