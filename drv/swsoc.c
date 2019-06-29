@@ -303,6 +303,10 @@ static long swsoc_ioctl(
       retval = -EFAULT; goto done; }
     if (cmd_mem.tid!=0 && cmd_mem.tid!=ret_tid) {retval=-EFAULT;goto done;}
     if (cmd_mem.key!=0) {
+      printk(KERN_DEBUG "(%d)%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+             swsoc->minor,
+             buftop[0],buftop[1],buftop[2],buftop[3],buftop[4],buftop[5],
+             buftop[6],buftop[7],buftop[8],buftop[9],buftop[10],buftop[11]);
       retval=-EFAULT;goto done;}
     get_size=(cmd_mem.val+3)/4*4;
     if (get_size>max_size) get_size=max_size;

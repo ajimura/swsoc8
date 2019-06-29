@@ -134,7 +134,7 @@ int sw_get_data0(int sw_fd, int port, unsigned int *data, unsigned int size)
   else             get_size=(j_size/4+1)*4;
   i = sw_br(sw_fd,port,data,get_size);
   if (i){
-    printf("Error in block read %X %X\n",i,get_size);
+    printf("Error in block read (sw_get_data0) %X %X\n",i,get_size);
     return -1;
   }
   i = sw_w(sw_fd,port,ADD_RX_CSR,0);
@@ -153,7 +153,7 @@ int sw_get_data(int sw_fd, int port, unsigned int *data, unsigned int size)
   swio.val=size;
   swio.ptr=data;
   if ((ret=ioctl(sw_fd,SW_PCKT_READ,&swio))<0){
-    printf("Error in block read %X %X\n",ret,swio.val);
+    printf("Error in block read (sw_get_data) %X %X\n",ret,swio.val);
     return -1;
   }
   return swio.val;
@@ -171,7 +171,7 @@ int sw_req(int sw_fd, int port, int cmd, int saddr, int daddr, int key, int tid,
   swio.addr=addr;
   swio.val=size;
   if ((ret=ioctl(sw_fd,RMAP_REQ,&swio))<0){
-    printf("Error in block read %d %X\n",ret,swio.val);
+    printf("Error in block read (sw_req) %d %X\n",ret,swio.val);
     return -1;
   }
   //  return swio.val;
@@ -186,7 +186,7 @@ int sw_rcv(int sw_fd, int port, unsigned int *data, int *status, int tid, int si
   swio.ptr=data;
   swio.tid=tid;
   if ((ret=ioctl(sw_fd,RMAP_RCV,&swio))<0){
-    printf("Error in block read %d %X\n",ret,swio.key);
+    printf("Error in block read (sw_rcv) %d %X\n",ret,swio.key);
     return -1;
   }
   *status=swio.key;
