@@ -30,6 +30,8 @@ struct swsoc_dev {
   struct swsoc_devinfo *devinfo;
   void * __iomem csr_ptr;
   void * __iomem data_ptr;
+  unsigned char *rx_buffer;
+  unsigned char *tx_buffer;
   int major;
   int minor;
 };
@@ -43,7 +45,7 @@ int rmap_create_buffer(unsigned char *,
 		       unsigned char, unsigned char, unsigned char, unsigned char,
 		       unsigned int, unsigned int, unsigned int, unsigned int);
 //unsigned char tx_buffer[1024];
-unsigned char *tx_buffer[DevsNum];
+//unsigned char *tx_buffer[DevsNum];
 unsigned char RM_CRCTbl [] = {
   0x00,0x91,0xe3,0x72,0x07,0x96,0xe4,0x75,  0x0e,0x9f,0xed,0x7c,0x09,0x98,0xea,0x7b,
   0x1c,0x8d,0xff,0x6e,0x1b,0x8a,0xf8,0x69,  0x12,0x83,0xf1,0x60,0x15,0x84,0xf6,0x67,
@@ -70,6 +72,7 @@ static int swsoc_open(struct inode *inode, struct file *file)
   unsigned int *csr;
   unsigned int *data;
   int major,minor;
+  unsigned char *rx_buffer, *tx_buffer;
 
   spin_lock(&swsoc_spin_lock);
 
@@ -95,13 +98,19 @@ static int swsoc_open(struct inode *inode, struct file *file)
   file->private_data = swsoc;
   swsoc->devinfo=swdevinfo;
 
-  tx_buffer[minor]=(unsigned char *)kmalloc(1024, GFP_KERNEL);
+  //  tx_buffer[minor]=(unsigned char *)kmalloc(1024, GFP_KERNEL);
+  tx_buffer=(unsigned char *)kmalloc(DATA_SPAN, GFP_KERNEL);
+  rx_buffer=(unsigned char *)kmalloc(DATA_SPAN, GFP_KERNEL);
+  printk(KERN_DEBUG "Tx/Rx Buffer alloc'ed on 0x%p 0x%p\n",tx_buffer,rx_buffer);
 
   csr=ioremap_nocache(CSR_BASE+CSR_SPAN*minor,CSR_SPAN);
   swsoc->csr_ptr=csr;
 
   data=ioremap_nocache(DATA_BASE+DATA_SPAN*minor,DATA_SPAN);
   swsoc->data_ptr=data;
+
+  swsoc->rx_buffer=rx_buffer;
+  swsoc->tx_buffer=tx_buffer;
 
   //  printk(KERN_DEBUG "SpW %08x\n",*(csr+1));
   //  printk(KERN_DEBUG "SpW RX %08x %08x\n",*(csr+4), *(csr+5));
@@ -133,7 +142,8 @@ static int swsoc_close(struct inode *inode, struct file *file)
   iounmap(swsoc->csr_ptr);
   iounmap(swsoc->data_ptr);
 
-  kfree(tx_buffer[minor]);
+  kfree(swsoc->tx_buffer);
+  kfree(swsoc->rx_buffer);
   kfree(swsoc);
 
   refcount[minor]=0;
@@ -151,6 +161,8 @@ static long swsoc_ioctl(
   struct swsoc_dev *swsoc = file->private_data;
   void * __iomem csrtop = swsoc->csr_ptr;
   void * __iomem datatop = swsoc->data_ptr;
+  unsigned char *tx_buffer = swsoc->tx_buffer;
+  unsigned char *rx_buffer = swsoc->rx_buffer;
 
   struct swio_mem cmd_mem;
   unsigned int address;
@@ -199,11 +211,13 @@ static long swsoc_ioctl(
     if (cmd_mem.val>DATA_SPAN-1) real_len=DATA_SPAN-1;
     else real_len=cmd_mem.val;
     if (real_len>0){
+      memcpy_fromio(rx_buffer,datatop,real_len);
+      rmb();
       if (!access_ok(VERIFY_WRITE, (void __user *)cmd_mem.ptr,real_len)){
 	retval = -EFAULT; goto done; }
-      if (copy_to_user((int __user *)cmd_mem.ptr, datatop, real_len)){
+      //      if (copy_to_user((int __user *)cmd_mem.ptr, datatop, real_len)){
+      if (copy_to_user((int __user *)cmd_mem.ptr, rx_buffer, real_len)){
 	retval = -EFAULT; goto done; }
-      rmb();
 #if VERB
       printk(KERN_DEBUG "(%d)IORB_cmd.size %x (%s)\n",minor,real_len, __func__);
 #endif
@@ -216,8 +230,10 @@ static long swsoc_ioctl(
     if (real_len>0){
       if (!access_ok(VERIFY_READ, (void __user *)cmd_mem.ptr,real_len)){
 	retval = -EFAULT; goto done; }
-      if (copy_from_user(datatop, (void __user *)cmd_mem.ptr,real_len)){
+      //      if (copy_from_user(datatop, (void __user *)cmd_mem.ptr,real_len)){
+      if (copy_from_user(tx_buffer, (void __user *)cmd_mem.ptr,real_len)){
 	retval = -EFAULT; goto done; }
+      memcpy_toio(datatop,tx_buffer,real_len);
       wmb();
 #if VERB
       printk(KERN_DEBUG "(%d)IOWB_cmd.size %x (%s)\n",minor,real_len, __func__);
@@ -233,9 +249,12 @@ static long swsoc_ioctl(
     real_len=data&0x0fffff;
     get_size=(real_len+3)/4*4;
     if (get_size>cmd_mem.val) get_size=cmd_mem.val;
+    memcpy_fromio(rx_buffer,datatop,real_len);
+    rmb();
     if (!access_ok(VERIFY_WRITE, (void __user *)cmd_mem.ptr,get_size)){
       retval = -EFAULT; goto done; }
-    if (copy_to_user((int __user *)cmd_mem.ptr, datatop, get_size)){
+    //    if (copy_to_user((int __user *)cmd_mem.ptr, datatop, get_size)){
+    if (copy_to_user((int __user *)cmd_mem.ptr, rx_buffer, get_size)){
       retval = -EFAULT; goto done; }
     rmb();
     iowrite32(0,csrtop+ADD_RX_CSR);
@@ -258,8 +277,10 @@ static long swsoc_ioctl(
     real_len=(put_size+3)/4*4;
     if (!access_ok(VERIFY_READ, (void __user *)cmd_mem.ptr,real_len)){
       retval = -EFAULT; goto done; }
-    if (copy_from_user(datatop, (void __user *)cmd_mem.ptr,real_len)){
+    //    if (copy_from_user(datatop, (void __user *)cmd_mem.ptr,real_len)){
+    if (copy_from_user(tx_buffer, (void __user *)cmd_mem.ptr,real_len)){
       retval = -EFAULT; goto done; }
+    memcpy_toio(datatop,tx_buffer,real_len);
     wmb();
     //    iowrite32(0x80400000+cmd_mem.val,csrtop+ADD_TX_CSR);
     iowrite32(0x80400000+put_size,csrtop+ADD_TX_CSR);
@@ -278,18 +299,18 @@ static long swsoc_ioctl(
     rmb();
     if ((data&0x80000000)!=0) {retval=-1; goto done;}
     if (cmd_mem.val>(data&0x0000fffc)) req_size=data&0x0000fffc; else req_size=cmd_mem.val;
-    put_size=rmap_create_buffer(tx_buffer[minor],cmd_mem.cmd,cmd_mem.saddr,cmd_mem.daddr,
+    put_size=rmap_create_buffer(tx_buffer,cmd_mem.cmd,cmd_mem.saddr,cmd_mem.daddr,
 				cmd_mem.key,cmd_mem.tid,cmd_mem.addr,req_size,cmd_mem.val);
     real_len=(put_size+3)/4*4;
 #if VERB
     printk(KERN_DEBUG "(%d)%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
 	   minor,
-	   tx_buffer[minor][0],tx_buffer[minor][1],tx_buffer[minor][2],tx_buffer[minor][3],
-	   tx_buffer[minor][4],tx_buffer[minor][5],tx_buffer[minor][6],tx_buffer[minor][7],
-	   tx_buffer[minor][8],tx_buffer[minor][9],tx_buffer[minor][10],tx_buffer[minor][11],
-	   tx_buffer[minor][12],tx_buffer[minor][13],tx_buffer[minor][14],tx_buffer[minor][15]);
+	   tx_buffer[0],tx_buffer[1],tx_buffer[2],tx_buffer[3],
+	   tx_buffer[4],tx_buffer[5],tx_buffer[6],tx_buffer[7],
+	   tx_buffer[8],tx_buffer[9],tx_buffer[10],tx_buffer[11],
+	   tx_buffer[12],tx_buffer[13],tx_buffer[14],tx_buffer[15]);
 #endif
-    memcpy_toio(datatop,tx_buffer[minor],real_len);
+    memcpy_toio(datatop,tx_buffer,real_len);
     wmb();
     iowrite32(0x80400000+put_size,csrtop+ADD_TX_CSR);
     wmb();
