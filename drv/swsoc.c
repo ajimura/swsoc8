@@ -211,12 +211,12 @@ static long swsoc_ioctl(
     if (cmd_mem.val>DATA_SPAN-1) real_len=DATA_SPAN-1;
     else real_len=cmd_mem.val;
     if (real_len>0){
-      memcpy_fromio(rx_buffer,datatop,real_len);
-      rmb();
+      //      memcpy_fromio(rx_buffer,datatop,real_len);
+      //      rmb();
       if (!access_ok(VERIFY_WRITE, (void __user *)cmd_mem.ptr,real_len)){
 	retval = -EFAULT; goto done; }
-      //      if (copy_to_user((int __user *)cmd_mem.ptr, datatop, real_len)){
-      if (copy_to_user((int __user *)cmd_mem.ptr, rx_buffer, real_len)){
+      if (copy_to_user((int __user *)cmd_mem.ptr, datatop, real_len)){
+	//      if (copy_to_user((int __user *)cmd_mem.ptr, rx_buffer, real_len)){
 	retval = -EFAULT; goto done; }
 #if VERB
       printk(KERN_DEBUG "(%d)IORB_cmd.size %x (%s)\n",minor,real_len, __func__);
@@ -230,10 +230,10 @@ static long swsoc_ioctl(
     if (real_len>0){
       if (!access_ok(VERIFY_READ, (void __user *)cmd_mem.ptr,real_len)){
 	retval = -EFAULT; goto done; }
-      //      if (copy_from_user(datatop, (void __user *)cmd_mem.ptr,real_len)){
-      if (copy_from_user(tx_buffer, (void __user *)cmd_mem.ptr,real_len)){
+      if (copy_from_user(datatop, (void __user *)cmd_mem.ptr,real_len)){
+	//      if (copy_from_user(tx_buffer, (void __user *)cmd_mem.ptr,real_len)){
 	retval = -EFAULT; goto done; }
-      memcpy_toio(datatop,tx_buffer,real_len);
+      //      memcpy_toio(datatop,tx_buffer,real_len);
       wmb();
 #if VERB
       printk(KERN_DEBUG "(%d)IOWB_cmd.size %x (%s)\n",minor,real_len, __func__);
@@ -249,12 +249,12 @@ static long swsoc_ioctl(
     real_len=data&0x0fffff;
     get_size=(real_len+3)/4*4;
     if (get_size>cmd_mem.val) get_size=cmd_mem.val;
-    memcpy_fromio(rx_buffer,datatop,real_len);
-    rmb();
+    //    memcpy_fromio(rx_buffer,datatop,real_len);
+    //    rmb();
     if (!access_ok(VERIFY_WRITE, (void __user *)cmd_mem.ptr,get_size)){
       retval = -EFAULT; goto done; }
-    //    if (copy_to_user((int __user *)cmd_mem.ptr, datatop, get_size)){
-    if (copy_to_user((int __user *)cmd_mem.ptr, rx_buffer, get_size)){
+    if (copy_to_user((int __user *)cmd_mem.ptr, datatop, get_size)){
+      //    if (copy_to_user((int __user *)cmd_mem.ptr, rx_buffer, get_size)){
       retval = -EFAULT; goto done; }
     rmb();
     iowrite32(0,csrtop+ADD_RX_CSR);
@@ -277,10 +277,10 @@ static long swsoc_ioctl(
     real_len=(put_size+3)/4*4;
     if (!access_ok(VERIFY_READ, (void __user *)cmd_mem.ptr,real_len)){
       retval = -EFAULT; goto done; }
-    //    if (copy_from_user(datatop, (void __user *)cmd_mem.ptr,real_len)){
-    if (copy_from_user(tx_buffer, (void __user *)cmd_mem.ptr,real_len)){
+    if (copy_from_user(datatop, (void __user *)cmd_mem.ptr,real_len)){
+      //    if (copy_from_user(tx_buffer, (void __user *)cmd_mem.ptr,real_len)){
       retval = -EFAULT; goto done; }
-    memcpy_toio(datatop,tx_buffer,real_len);
+    //    memcpy_toio(datatop,tx_buffer,real_len);
     wmb();
     //    iowrite32(0x80400000+cmd_mem.val,csrtop+ADD_TX_CSR);
     iowrite32(0x80400000+put_size,csrtop+ADD_TX_CSR);
